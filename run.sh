@@ -9,12 +9,17 @@ echo "========================================"
 PORT=${PORT:-8080}
 DOMAIN=${RAILWAY_STATIC_URL:-"your-proxy.up.railway.app"}
 
-# تولید کلید اگر وجود ندارد
-if [ -z "$SECRET_KEY" ]; then
+# تولید کلید اگر وجود ندارد - با متغیر SECRET (نه SECRET_KEY)
+if [ -z "$SECRET" ]; then
     echo "🔑 Generating new secret key..."
     # روش صحیح تولید کلید برای mtg v2
-    SECRET_KEY=$(openssl rand -hex 32 | xxd -r -p | base64)
+    SECRET=$(openssl rand -hex 16 | xxd -r -p | base64 | tr -d '\n=')
     echo "✅ Secret key generated!"
+    echo "🔐 Secret: $SECRET"
+    echo ""
+    export SECRET
+else
+    echo "🔑 Using provided secret key"
     echo ""
 fi
 
@@ -22,7 +27,7 @@ fi
 echo "📊 Proxy Information:"
 echo "• Domain: $DOMAIN"
 echo "• Port: $PORT"
-echo "• Secret: ${SECRET_KEY:0:20}..."
+echo "• Secret starts with: ${SECRET:0:20}..."
 echo ""
 
 # بررسی mtg
@@ -33,23 +38,28 @@ fi
 
 # نمایش ورژن
 echo "🔧 mtg version:"
-/usr/local/bin/mtg version
+mtg version
 echo ""
 
 # ساخت لینک‌ها
-if [ ! -z "$SECRET_KEY" ]; then
+if [ ! -z "$SECRET" ]; then
     echo "📱 Telegram Links:"
-    echo "• Web: https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET_KEY"
-    echo "• App: tg://proxy?server=$DOMAIN&port=443&secret=$SECRET_KEY"
+    echo ""
+    echo "🌐 For browser:"
+    echo "https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET"
+    echo ""
+    echo "📲 For Telegram app:"
+    echo "tg://proxy?server=$DOMAIN&port=443&secret=$SECRET"
     echo ""
 fi
 
 echo "🔄 Starting proxy on port $PORT..."
-echo "   Using secret: ${SECRET_KEY:0:20}..."
 echo "========================================"
 
 # اجرای پروکسی
-exec /usr/local/bin/mtg run \
+exec mtg run \
     --bind "0.0.0.0:$PORT" \
-    --secret "$SECRET_KEY" \
-    --cloak-port 443
+    --secret "$SECRET" \
+    --cloak-port 443 \
+    --stats ":8081" \
+    --verbose
