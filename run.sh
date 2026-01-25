@@ -1,65 +1,79 @@
 #!/bin/bash
 
 echo "========================================"
-echo "🚀 MTProto Proxy for Telegram"
-echo "📡 Hosted on Railway"
+echo "🚀 STARTING MTProto Proxy"
 echo "========================================"
 
-# تنظیمات پیش‌فرض
-PORT=${PORT:-8080}
-DOMAIN=${RAILWAY_STATIC_URL:-"your-proxy.up.railway.app"}
-
-# تولید کلید اگر وجود ندارد - با متغیر SECRET (نه SECRET_KEY)
-if [ -z "$SECRET" ]; then
-    echo "🔑 Generating new secret key..."
-    # روش صحیح تولید کلید برای mtg v2
-    SECRET=$(openssl rand -hex 16 | xxd -r -p | base64 | tr -d '\n=')
-    echo "✅ Secret key generated!"
-    echo "🔐 Secret: $SECRET"
-    echo ""
-    export SECRET
-else
-    echo "🔑 Using provided secret key"
-    echo ""
-fi
-
-# نمایش اطلاعات
-echo "📊 Proxy Information:"
-echo "• Domain: $DOMAIN"
-echo "• Port: $PORT"
-echo "• Secret starts with: ${SECRET:0:20}..."
+# لاگ همه متغیرهای محیطی
+echo "📋 Environment variables:"
+echo "PORT: ${PORT:-not set}"
+echo "RAILWAY_STATIC_URL: ${RAILWAY_STATIC_URL:-not set}"
+echo "PWD: $(pwd)"
+echo "PATH: $PATH"
 echo ""
 
-# بررسی mtg
-if [ ! -f /usr/local/bin/mtg ]; then
-    echo "❌ ERROR: mtg not found!"
+# بررسی وجود mtg
+echo "🔍 Checking for mtg..."
+if command -v mtg > /dev/null 2>&1; then
+    echo "✅ mtg found at: $(which mtg)"
+    echo "mtg version: $(mtg version 2>/dev/null || echo 'cannot get version')"
+else
+    echo "❌ mtg NOT FOUND in PATH!"
+    echo "Searching for mtg binary..."
+    find / -name mtg -type f 2>/dev/null | head -10
     exit 1
 fi
 
-# نمایش ورژن
-echo "🔧 mtg version:"
-mtg version
+# تولید secret
+echo ""
+echo "🔑 Generating secret..."
+SECRET=$(openssl rand -hex 16 | xxd -r -p | base64 | tr -d '\n=')
+echo "✅ Secret generated: $SECRET"
 echo ""
 
-# ساخت لینک‌ها
-if [ ! -z "$SECRET" ]; then
-    echo "📱 Telegram Links:"
-    echo ""
-    echo "🌐 For browser:"
-    echo "https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET"
-    echo ""
-    echo "📲 For Telegram app:"
-    echo "tg://proxy?server=$DOMAIN&port=443&secret=$SECRET"
-    echo ""
+# نمایش اطلاعات
+DOMAIN="${RAILWAY_STATIC_URL:-proxy.up.railway.app}"
+PORT="${PORT:-8080}"
+
+echo "📊 Configuration:"
+echo "• Bind: 0.0.0.0:$PORT"
+echo "• Domain: $DOMAIN"
+echo "• Secret: ${SECRET:0:30}..."
+echo ""
+
+# ساخت لینک تلگرام
+echo "📱 Telegram links:"
+echo "1. tg://proxy?server=$DOMAIN&port=443&secret=$SECRET"
+echo "2. https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET"
+echo ""
+
+# شروع یک healthcheck ساده در پس‌زمینه
+echo "🩺 Starting healthcheck server on port 8081..."
+(
+    while true; do
+        echo -e "HTTP/1.1 200 OK\r\n\r\nMTProto Proxy OK" | nc -l -p 8081 -q 1 2>/dev/null || \
+        echo -e "HTTP/1.1 200 OK\r\n\r\nOK" | busybox nc -l -p 8081 -q 1 2>/dev/null || \
+        sleep 1
+    done
+) &
+
+# تست دستور mtg قبل از اجرا
+echo "🧪 Testing mtg command..."
+if mtg run --help > /dev/null 2>&1; then
+    echo "✅ mtg command works"
+else
+    echo "❌ mtg command failed"
+    echo "Trying to run mtg directly:"
+    /usr/local/bin/mtg run --help || echo "Direct execution also failed"
 fi
 
-echo "🔄 Starting proxy on port $PORT..."
+echo ""
+echo "🔄 STARTING MTG PROXY..."
 echo "========================================"
 
-# اجرای پروکسی
+# اجرای mtg با تمام لاگ‌ها
 exec mtg run \
     --bind "0.0.0.0:$PORT" \
     --secret "$SECRET" \
     --cloak-port 443 \
-    --stats ":8081" \
-    --verbose
+    --verbose 2>&1
