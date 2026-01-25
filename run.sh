@@ -1,43 +1,55 @@
 #!/bin/bash
 
 echo "========================================"
-echo "🚀 MTProto Proxy برای تلگرام"
+echo "🚀 MTProto Proxy for Telegram"
+echo "📡 Hosted on Railway"
 echo "========================================"
 
-# اگر کلید وجود نداشت، بساز
-if [ -z "$SECRET" ]; then
-    echo "🔑 ساخت کلید جدید..."
-    SECRET=$(openssl rand -hex 16 | base64 | tr -d '=' | tr '+/' '-_')
-    echo "✅ کلید ساخته شد!"
-    echo "🔐 کلید شما: $SECRET"
-    echo "⚠️ این کلید را ذخیره کن!"
+# تنظیمات پیش‌فرض
+PORT=${PORT:-8080}
+DOMAIN=${RAILWAY_STATIC_URL:-"your-proxy.up.railway.app"}
+
+# تولید کلید اگر وجود ندارد
+if [ -z "$SECRET_KEY" ]; then
+    echo "🔑 Generating new secret key..."
+    # روش صحیح تولید کلید برای mtg v2
+    SECRET_KEY=$(openssl rand -hex 32 | xxd -r -p | base64)
+    echo "✅ Secret key generated!"
+    echo ""
 fi
 
-echo ""
-echo "📊 اطلاعات پروکسی:"
-echo "• دامنه: ${RAILWAY_STATIC_URL:-your-domain.up.railway.app}"
-echo "• پورت: 443"
-echo "• کلید: $SECRET"
+# نمایش اطلاعات
+echo "📊 Proxy Information:"
+echo "• Domain: $DOMAIN"
+echo "• Port: $PORT"
+echo "• Secret: ${SECRET_KEY:0:20}..."
 echo ""
 
-# ساخت لینک تلگرام
-DOMAIN="${RAILWAY_STATIC_URL:-your-domain.up.railway.app}"
-TG_LINK="https://t.me/proxy?server=${DOMAIN}&port=443&secret=${SECRET}"
-DIRECT_LINK="tg://proxy?server=${DOMAIN}&port=443&secret=${SECRET}"
+# بررسی mtg
+if [ ! -f /usr/local/bin/mtg ]; then
+    echo "❌ ERROR: mtg not found!"
+    exit 1
+fi
 
-echo "📱 لینک پروکسی:"
-echo "$TG_LINK"
+# نمایش ورژن
+echo "🔧 mtg version:"
+/usr/local/bin/mtg version
 echo ""
-echo "📲 لینک مستقیم (برای موبایل):"
-echo "$DIRECT_LINK"
-echo ""
-echo "========================================"
-echo "🔄 در حال راه‌اندازی پروکسی..."
+
+# ساخت لینک‌ها
+if [ ! -z "$SECRET_KEY" ]; then
+    echo "📱 Telegram Links:"
+    echo "• Web: https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET_KEY"
+    echo "• App: tg://proxy?server=$DOMAIN&port=443&secret=$SECRET_KEY"
+    echo ""
+fi
+
+echo "🔄 Starting proxy on port $PORT..."
+echo "   Using secret: ${SECRET_KEY:0:20}..."
 echo "========================================"
 
 # اجرای پروکسی
-exec mtg run \
+exec /usr/local/bin/mtg run \
     --bind "0.0.0.0:$PORT" \
-    --adapter "mem" \
-    --cloak-port 443 \
-    "$SECRET"
+    --secret "$SECRET_KEY" \
+    --cloak-port 443
