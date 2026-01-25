@@ -1,23 +1,26 @@
 FROM alpine:latest
 
-# نصب پیش‌نیازها
+# نصب ابزارهای لازم
 RUN apk update && apk add --no-cache \
     curl \
     bash \
     openssl \
-    wget
+    ca-certificates
 
-# دانلود MTProxy
+# دانلود mtg v2.1.7 (پایدار)
 RUN wget -O /usr/local/bin/mtg \
-    https://github.com/9seconds/mtg/releases/download/v2.1.8/mtg-linux-amd64 \
+    https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg \
     && chmod +x /usr/local/bin/mtg
 
-# کپی اسکریپت اجرا
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
+# ایجاد دایرکتوری کاری
+WORKDIR /app
 
-# اکسپوز پورت
+# کپی اسکریپت
+COPY run.sh /app/run.sh
+RUN chmod +x /app/run.sh
+
+# پورت‌ها
 EXPOSE 8080
 
-# اجرای اصلی
-CMD ["/run.sh"]
+# اجرا
+CMD ["/app/run.sh"]
