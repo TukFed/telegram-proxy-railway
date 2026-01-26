@@ -2,24 +2,9 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile",
-    "watchPatterns": [
-      "**/*.go",
-      "**/*.toml",
-      "**/*.sh",
-      "**/Dockerfile"
-    ]
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "numReplicas": 1,
-    "restartPolicyType": "ALWAYS",
-    "restartPolicyMaxRetries": 10,
-    "healthcheckPath": "/",
-    "healthcheckTimeout": 30,
-    "healthcheckInterval": 60
-  },
-  "variables": {
-    "NODE_ENV": "production",
-    "TZ": "UTC"
+    "restartPolicyType": "ALWAYS"
   }
 }
