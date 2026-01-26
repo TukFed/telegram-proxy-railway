@@ -5,10 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "/run.sh",
-    "restartPolicyType": "ALWAYS",
-    "healthcheckPath": ":8081",
-    "healthcheckTimeout": 10,
-    "healthcheckInterval": 5
+    "startCommand": "/start.sh",
+    "restartPolicyType": "ALWAYS"
   }
 }
