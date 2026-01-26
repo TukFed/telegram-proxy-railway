@@ -12,31 +12,9 @@ RUN wget -q -O /tmp/mtg.tar.gz https://github.com/9seconds/mtg/releases/download
 # تست mtg
 RUN mtg --version
 
+# کپی اسکریپت run.sh
+COPY run.sh /app/run.sh
+RUN chmod +x /app/run.sh
+
 # اجرا
-CMD sh -c "
-echo '========================================'
-echo '🚀 TELEGRAM MTPROTO PROXY'
-echo '========================================'
-
-# تولید کلید با خود mtg
-SECRET=\$(mtg generate-secret --hex telegram.org)
-
-REAL_DOMAIN=\${RAILWAY_STATIC_URL}
-if [ -z \"\$REAL_DOMAIN\" ]; then
-    REAL_DOMAIN=proxy.up.railway.app
-fi
-
-echo '✅ Secret: '\$SECRET
-echo '🌐 Domain: '\$REAL_DOMAIN
-echo ''
-echo '📱 TELEGRAM LINKS:'
-echo '1. tg://proxy?server='\$REAL_DOMAIN'&port=443&secret='\$SECRET
-echo '2. https://t.me/proxy?server='\$REAL_DOMAIN'&port=443&secret='\$SECRET
-echo ''
-echo '========================================'
-echo '🔄 Starting proxy...'
-echo '========================================'
-
-# اجرای پروکسی
-exec mtg simple-run '0.0.0.0:'\${PORT:-8080} \"\$SECRET\"
-"
+CMD ["/app/run.sh"]
