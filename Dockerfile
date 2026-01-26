@@ -25,5 +25,7 @@ RUN echo '#!/bin/sh' > /start.sh && \
     echo 'exec mtg run --bind "0.0.0.0:$PORT" --secret "$SECRET" --cloak-port 443' >> /start.sh && \
     chmod +x /start.sh
 
+RUN mtg --help
+
 EXPOSE 8080
 CMD ["/start.sh"]
