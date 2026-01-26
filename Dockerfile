@@ -1,34 +1,41 @@
-FROM alpine:3.18
+FROM alpine:latest
 
-# نصب بسته‌های ضروری
-RUN apk update && apk add --no-cache \
-    curl \
-    python3 \
-    py3-pip \
-    openssl \
-    tzdata \
-    && pip3 install --no-cache-dir requests
+# نصب ابزارهای لازم
+RUN apk update && apk add --no-cache curl tar
 
-# دانلود آخرین نسخه mtg
-ENV MTG_VERSION="2.1.7"
-RUN curl -L https://github.com/9seconds/mtg/releases/download/v${MTG_VERSION}/mtg-${MTG_VERSION}-linux-amd64.tar.gz \
+# دانلود mtg نسخه 2.1.7
+RUN curl -sL "https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg-2.1.7-linux-amd64.tar.gz" \
     -o /tmp/mtg.tar.gz \
     && tar -xzf /tmp/mtg.tar.gz -C /tmp/ \
-    && mv /tmp/mtg-${MTG_VERSION}-linux-amd64/mtg /usr/local/bin/mtg \
+    && mv /tmp/mtg-2.1.7-linux-amd64/mtg /usr/local/bin/mtg \
     && chmod +x /usr/local/bin/mtg \
-    && rm -rf /tmp/mtg* \
-    && mtg --version
+    && rm -rf /tmp/mtg*
 
-# کپی فایل‌ها
-COPY start.sh /app/start.sh
-COPY healthcheck.py /app/healthcheck.py
-COPY config.toml /app/config.toml
+# تست نصب
+RUN mtg --version
 
-# دسترسی‌های لازم
-RUN chmod +x /app/start.sh /app/healthcheck.py
-
-# پورت اکسپوز
-EXPOSE 8080
-
-# اجرا
-CMD ["/app/start.sh"]
+# اسکریپت اجرا
+CMD ["sh", "-c", "\
+# تولید کلید
+SECRET=\$(mtg generate-secret --hex telegram.org)\
+DOMAIN=\${RAILWAY_STATIC_URL:-'proxy.up.railway.app'}\
+PORT=\${PORT:-8080}\
+\
+echo '========================================'\
+echo '🚀 TELEGRAM MTPROTO PROXY'\
+echo '========================================'\
+echo '✅ Secret: '\$SECRET\
+echo '🌐 Domain: '\$DOMAIN\
+echo '🔌 Port: '\$PORT\
+echo ''\
+echo '📱 TELEGRAM LINKS:'\
+echo '1. tg://proxy?server='\$DOMAIN'&port=443&secret='\$SECRET\
+echo '2. https://t.me/proxy?server='\$DOMAIN'&port=443&secret='\$SECRET\
+echo ''\
+echo '========================================'\
+echo '🔄 Starting proxy...'\
+echo '========================================'\
+\
+# اجرای پروکسی\
+exec mtg simple-run \"0.0.0.0:\$PORT\" \"\$SECRET\"\
+"]
