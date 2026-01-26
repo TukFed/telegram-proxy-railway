@@ -1,12 +1,13 @@
 # تنظیمات اصلی
-secret = "${SECRET_KEY}"  # یا از SECRET_KEY محیطی استفاده می‌کند
+secret = ""  # خالی بگذارید - در اسکریپت پر می‌شود
 bind-to = "0.0.0.0:${PORT}"
 
 # تنظیمات شبکه
 [network]
-timeout = "30s"
+timeout = { tcp = "30s", http = "30s", idle = "5m" }
 prefer-ip = "prefer-ipv6"
 tcp-buffer = "64KB"
+concurrency = 8192
 
 # ضد حملات تکرار
 [antireplay]
@@ -23,13 +24,13 @@ update-every = "6h"
 
 # جلوگیری از تشخیص (FakeTLS)
 [tls]
-domain = "${RAILWAY_STATIC_URL}"
+domain = "${DOMAIN}"
 port = 443
 
 # ارسال آمار
 [stats]
 [stats.statsd]
-address = ""  # غیرفعال - اگر نیاز داشتید تنظیم کنید
+address = ""
 
 [stats.prometheus]
 enable = false
@@ -48,4 +49,4 @@ path = "/dns-query"
 
 # تنظیمات SOCKS5 (برای زنجیره کردن پروکسی)
 [proxy]
-type = "none"  # "socks5" اگر نیاز به proxy chain داشتید
+type = "none"
