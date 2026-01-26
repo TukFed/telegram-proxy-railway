@@ -6,15 +6,14 @@ RUN apk update && apk add --no-cache \
     bash \
     tar \
     gzip \
-    openssl \
-    ca-certificates
+    openssl
 
-# دانلود mtg مستقیماً از source خود پروژه
+# دانلود mtg
 RUN curl -sL "https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg-2.1.7-linux-amd64.tar.gz" \
     | tar -xz -C /usr/local/bin/ --strip-components=1 mtg-2.1.7-linux-amd64/mtg \
     && chmod +x /usr/local/bin/mtg
 
-# ایجاد اسکریپت اجرا درست داخل Dockerfile
+# ایجاد اسکریپت اجرا
 RUN echo '#!/bin/sh' > /start.sh && \
     echo 'echo "🚀 Starting MTProto Proxy..."' >> /start.sh && \
     echo 'PORT=${PORT:-8080}' >> /start.sh && \
@@ -22,10 +21,8 @@ RUN echo '#!/bin/sh' > /start.sh && \
     echo 'echo "🔑 Secret: $SECRET"' >> /start.sh && \
     echo 'echo "🌐 Domain: ${RAILWAY_STATIC_URL}"' >> /start.sh && \
     echo 'echo "📱 Link: https://t.me/proxy?server=${RAILWAY_STATIC_URL}&port=443&secret=$SECRET"' >> /start.sh && \
-    echo 'exec mtg run --bind "0.0.0.0:$PORT" --secret "$SECRET" --cloak-port 443' >> /start.sh && \
+    echo 'exec mtg run --bind-to "0.0.0.0:$PORT" --secret "$SECRET" --cloak-port 443' >> /start.sh && \
     chmod +x /start.sh
-
-RUN mtg --help
 
 EXPOSE 8080
 CMD ["/start.sh"]
