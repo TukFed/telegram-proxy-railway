@@ -11,19 +11,26 @@ RUN wget -q -O /tmp/mtg.tar.gz \
     && chmod +x /usr/local/bin/mtg \
     && rm -rf /tmp/*
 
-# اسکریپت راه‌اندازی
+# اسکریپت راه‌اندازی اصلاح شده
 RUN cat > /start.sh << 'EOF'
 #!/bin/sh
 set -e
 
 echo "=== MTProto Proxy on Railway ==="
 
-# تولید سکرت FakeTLS (شروع با ee)
+# تولید سکرت FakeTLS - سینتکس صحیح نسخه 2
 if [ -z "$SECRET" ]; then
-    SECRET=$(/usr/local/bin/mtg generate-secret tls -c www.cloudflare.com | tr -d '\n')
+    # فقط نام دامنه رو می‌دیم، خودش ee تولید می‌کنه
+    SECRET=$(/usr/local/bin/mtg generate-secret cloudflare.com)
     echo "🆕 Secret جدید تولید شد: $SECRET"
 else
     echo "🔑 Secret از متغیر محیطی: $SECRET"
+fi
+
+# چک کردن اینکه secret خالی نباشه
+if [ -z "$SECRET" ]; then
+    echo "❌ خطا: Secret تولید نشد!"
+    exit 1
 fi
 
 # پورت Railway (پیش‌فرض 8080)
@@ -41,20 +48,33 @@ fi
 echo "🌐 Server: $SERVER"
 echo "🔌 Port: $PORT"
 
-# ساخت لینک صحیح (بدون space)
+# ساخت لینک صحیح
 LINK="https://t.me/proxy?server=${SERVER}&port=${PORT}&secret=${SECRET}"
 echo ""
 echo "📱 لینک اتصال تلگرام:"
 echo "$LINK"
 echo ""
-echo "⚠️  برای اتصال، Secret باید با 'ee' شروع بشه (FakeTLS)"
+
+# چک کردن اینکه secret با ee شروع میشه (FakeTLS)
+case "$SECRET" in
+    ee*)
+        echo "✅ Secret به درستی با 'ee' شروع می‌شود (FakeTLS فعال)"
+        ;;
+    *)
+        echo "⚠️  توجه: Secret با 'ee' شروع نمی‌شود. در حال تولید دوباره..."
+        SECRET=$(/usr/local/bin/mtg generate-secret cloudflare.com)
+        echo "🔑 Secret جدید: $SECRET"
+        ;;
+esac
+
+echo ""
+echo "🚀 در حال اجرای پروکسی..."
 echo ""
 
-# اجرای پروکسی روی 0.0.0.0
+# اجرای پروکسی
 exec /usr/local/bin/mtg simple-run "0.0.0.0:${PORT}" "${SECRET}"
 EOF
 
 RUN chmod +x /start.sh
 
-# Railway خودش PORT رو مدیریت می‌کنه
 CMD ["/start.sh"]
