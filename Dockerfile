@@ -4,18 +4,21 @@ FROM alpine:latest
 # ابزارهای لازم را نصب می‌کنیم
 RUN apk update && apk add --no-cache wget tar
 
-# دانلود و نصب mtg
+# دانلود و استخراج با بررسی محتوای آرشیو
 RUN wget -q -O /tmp/mtg.tar.gz \
     https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg-2.1.7-linux-amd64.tar.gz \
-    && tar -xzf /tmp/mtg.tar.gz -C /usr/local/bin/ mtg \
+    && echo "=== محتوای آرشیو ===" && tar -tzf /tmp/mtg.tar.gz \
+    && tar -xzf /tmp/mtg.tar.gz -C /tmp/ \
+    && echo "=== فایل‌های استخراج شده در /tmp ===" && ls -la /tmp/ \
+    && find /tmp -name "mtg*" -type f -exec mv {} /usr/local/bin/mtg \; \
     && chmod +x /usr/local/bin/mtg \
-    && rm /tmp/mtg.tar.gz
+    && rm -f /tmp/mtg.tar.gz
 
 # ایجاد اسکریپت راه‌اندازی
 RUN echo '#!/bin/sh' > /start.sh && \
     echo 'echo "=== MTProxy Auto-Setup ==="' >> /start.sh && \
     echo '' >> /start.sh && \
-    echo '# تولید سکرت جدید (اختیاری: میتوانید یک سکرت ثابت هم بدهید)' >> /start.sh && \
+    echo '# تولید سکرت جدید' >> /start.sh && \
     echo 'export SECRET=$(/usr/local/bin/mtg generate-secret --hex google.com)' >> /start.sh && \
     echo '' >> /start.sh && \
     echo '# دریافت آدرس عمومی (اگر Railway باشد)' >> /start.sh && \
