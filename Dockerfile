@@ -1,23 +1,30 @@
+# از یک تصویر سبک استفاده می‌کنیم
 FROM alpine:latest
 
-RUN apk update && apk add curl tar
+# ابزارهای لازم را نصب می‌کنیم
+RUN apk update && apk add --no-cache wget tar
 
-# دانلود مستقیم mtg
-RUN wget -q -O /usr/local/bin/mtg \
-    https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg_2.1.7_linux_amd64.tar.gz \
-    && tar -xzf /usr/local/bin/mtg -C /usr/local/bin/ \
-    && chmod +x /usr/local/bin/mtg
+# دانلود و نصب mtg در مسیر صحیح
+RUN wget -q -O /tmp/mtg.tar.gz \
+    https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg-linux-amd64.tar.gz \
+    && tar -xzf /tmp/mtg.tar.gz -C /usr/local/bin/ mtg-linux-amd64 \
+    && mv /usr/local/bin/mtg-linux-amd64 /usr/local/bin/mtg \
+    && chmod +x /usr/local/bin/mtg \
+    && rm /tmp/mtg.tar.gz
 
-# ایجاد اسکریپت اجرا
+# یک فایل کانفیگ ساده ایجاد می‌کنیم
+RUN echo 'bind-to = "0.0.0.0:$PORT"' > /config.toml.template
+RUN echo 'secret = "$SECRET"' >> /config.toml.template
+
+# اسکریپت شروع که متغیرها را جایگزین می‌کند
 RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'echo "Starting MTProto Proxy..."' >> /start.sh && \
-    echo 'SECRET=$(mtg generate-secret --hex google.com)' >> /start.sh && \
-    echo 'DOMAIN=${RAILWAY_STATIC_URL:-proxy.railway.app}' >> /start.sh && \
-    echo 'PORT=${PORT:-8080}' >> /start.sh && \
-    echo 'echo "Secret: $SECRET"' >> /start.sh && \
-    echo 'echo "Link: https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET"' >> /start.sh && \
-    echo 'exec mtg simple-run "0.0.0.0:$PORT" "$SECRET"' >> /start.sh && \
+    echo 'echo "جایگزینی متغیرهای محیطی در کانفیگ..."' >> /start.sh && \
+    echo 'envsubst < /config.toml.template > /config.toml' >> /start.sh && \
+    echo 'echo "آماده‌سازی پروکسی با سکرت ارائه شده..."' >> /start.sh && \
+    echo 'exec mtg run /config.toml' >> /start.sh && \
     chmod +x /start.sh
 
-EXPOSE 8080
+# Railway پورت را خودش مدیریت می‌کند
+EXPOSE $PORT
+
 CMD ["/start.sh"]
