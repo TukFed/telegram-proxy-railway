@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # نصب ابزارهای لازم
-RUN apk add --no-cache wget tar
+RUN apk add --no-cache wget tar openssl xxd
 
 # دانلود mtg نسخه 2.1.7
 RUN wget -q -O /tmp/mtg.tar.gz \
@@ -11,25 +11,36 @@ RUN wget -q -O /tmp/mtg.tar.gz \
     && chmod +x /usr/local/bin/mtg \
     && rm -rf /tmp/*
 
-# اسکریپت راه‌اندازی اصلاح شده
+# اسکریپت راه‌اندازی
 RUN cat > /start.sh << 'EOF'
 #!/bin/sh
 set -e
 
-echo "=== MTProto Proxy on Railway ==="
+echo "=========================================="
+echo "   MTProto Proxy - Railway"
+echo "=========================================="
 
-# تولید سکرت FakeTLS - سینتکس صحیح نسخه 2
+# تولید Secret FakeTLS (اگر تنظیم نشده باشه)
 if [ -z "$SECRET" ]; then
-    # فقط نام دامنه رو می‌دیم، خودش ee تولید می‌کنه
-    SECRET=$(/usr/local/bin/mtg generate-secret cloudflare.com)
-    echo "🆕 Secret جدید تولید شد: $SECRET"
+    echo "🔄 در حال تولید سکرت FakeTLS..."
+    
+    # 16 بایت رندوم (32 کاراکتر هگز)
+    RANDOM_HEX=$(openssl rand -hex 16)
+    
+    # تبدیل دامنه به هگز (cloudflare.com)
+    DOMAIN_HEX=$(printf 'cloudflare.com' | xxd -p | tr -d '\n')
+    
+    # ساخت سکرت: ee + رندوم + دامنه
+    SECRET="ee${RANDOM_HEX}${DOMAIN_HEX}"
+    
+    echo "✅ سکرت جدید: $SECRET"
 else
-    echo "🔑 Secret از متغیر محیطی: $SECRET"
+    echo "🔑 استفاده از سکرت موجود: $SECRET"
 fi
 
-# چک کردن اینکه secret خالی نباشه
-if [ -z "$SECRET" ]; then
-    echo "❌ خطا: Secret تولید نشد!"
+# چک کردن فرمت صحیح (باید با ee شروع بشه)
+if [ "${SECRET#ee}" = "$SECRET" ]; then
+    echo "❌ خطا: سکرت باید با 'ee' شروع بشه (FakeTLS)"
     exit 1
 fi
 
@@ -42,39 +53,28 @@ if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
 elif [ -n "$RAILWAY_STATIC_URL" ]; then
     SERVER=$(echo "$RAILWAY_STATIC_URL" | sed 's|https://||')
 else
-    SERVER="localhost"
+    SERVER="0.0.0.0"
+    echo "⚠️  دامنه یافت نشد، استفاده از 0.0.0.0"
 fi
 
+echo ""
 echo "🌐 Server: $SERVER"
 echo "🔌 Port: $PORT"
-
-# ساخت لینک صحیح
-LINK="https://t.me/proxy?server=${SERVER}&port=${PORT}&secret=${SECRET}"
-echo ""
-echo "📱 لینک اتصال تلگرام:"
-echo "$LINK"
 echo ""
 
-# چک کردن اینکه secret با ee شروع میشه (FakeTLS)
-case "$SECRET" in
-    ee*)
-        echo "✅ Secret به درستی با 'ee' شروع می‌شود (FakeTLS فعال)"
-        ;;
-    *)
-        echo "⚠️  توجه: Secret با 'ee' شروع نمی‌شود. در حال تولید دوباره..."
-        SECRET=$(/usr/local/bin/mtg generate-secret cloudflare.com)
-        echo "🔑 Secret جدید: $SECRET"
-        ;;
-esac
-
+# نمایش لینک اتصال
+echo "📱 لینک تلگرام:"
+echo "https://t.me/proxy?server=${SERVER}&port=${PORT}&secret=${SECRET}"
 echo ""
-echo "🚀 در حال اجرای پروکسی..."
-echo ""
+echo "=========================================="
 
-# اجرای پروکسی
+# اجرای پروکسی (مهم: exec برای جلویری از exit)
 exec /usr/local/bin/mtg simple-run "0.0.0.0:${PORT}" "${SECRET}"
 EOF
 
 RUN chmod +x /start.sh
+
+# Railway پورت رو خودش مدیریت می‌کنه
+EXPOSE ${PORT}
 
 CMD ["/start.sh"]
