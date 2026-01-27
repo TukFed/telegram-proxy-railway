@@ -1,41 +1,23 @@
 FROM alpine:latest
 
-# نصب ابزارهای لازم
-RUN apk update && apk add --no-cache curl tar
+RUN apk update && apk add curl tar
 
-# دانلود mtg نسخه 2.1.7
-RUN curl -sL "https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg-2.1.7-linux-amd64.tar.gz" \
-    -o /tmp/mtg.tar.gz \
-    && tar -xzf /tmp/mtg.tar.gz -C /tmp/ \
-    && mv /tmp/mtg-2.1.7-linux-amd64/mtg /usr/local/bin/mtg \
-    && chmod +x /usr/local/bin/mtg \
-    && rm -rf /tmp/mtg*
+# دانلود مستقیم mtg
+RUN wget -q -O /usr/local/bin/mtg \
+    https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg_2.1.7_linux_amd64.tar.gz \
+    && tar -xzf /usr/local/bin/mtg -C /usr/local/bin/ \
+    && chmod +x /usr/local/bin/mtg
 
-# تست نصب
-RUN mtg --version
+# ایجاد اسکریپت اجرا
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'echo "Starting MTProto Proxy..."' >> /start.sh && \
+    echo 'SECRET=$(mtg generate-secret --hex google.com)' >> /start.sh && \
+    echo 'DOMAIN=${RAILWAY_STATIC_URL:-proxy.railway.app}' >> /start.sh && \
+    echo 'PORT=${PORT:-8080}' >> /start.sh && \
+    echo 'echo "Secret: $SECRET"' >> /start.sh && \
+    echo 'echo "Link: https://t.me/proxy?server=$DOMAIN&port=443&secret=$SECRET"' >> /start.sh && \
+    echo 'exec mtg simple-run "0.0.0.0:$PORT" "$SECRET"' >> /start.sh && \
+    chmod +x /start.sh
 
-# اسکریپت اجرا
-CMD ["sh", "-c", "\
-# تولید کلید
-SECRET=\$(mtg generate-secret --hex telegram.org)\
-DOMAIN=\${RAILWAY_STATIC_URL:-'proxy.up.railway.app'}\
-PORT=\${PORT:-8080}\
-\
-echo '========================================'\
-echo '🚀 TELEGRAM MTPROTO PROXY'\
-echo '========================================'\
-echo '✅ Secret: '\$SECRET\
-echo '🌐 Domain: '\$DOMAIN\
-echo '🔌 Port: '\$PORT\
-echo ''\
-echo '📱 TELEGRAM LINKS:'\
-echo '1. tg://proxy?server='\$DOMAIN'&port=443&secret='\$SECRET\
-echo '2. https://t.me/proxy?server='\$DOMAIN'&port=443&secret='\$SECRET\
-echo ''\
-echo '========================================'\
-echo '🔄 Starting proxy...'\
-echo '========================================'\
-\
-# اجرای پروکسی\
-exec mtg simple-run \"0.0.0.0:\$PORT\" \"\$SECRET\"\
-"]
+EXPOSE 8080
+CMD ["/start.sh"]
