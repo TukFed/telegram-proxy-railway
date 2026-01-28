@@ -1,48 +1,45 @@
-FROM alpine:latest
+FROM python:3.9-alpine
 
-RUN apk add --no-cache wget tar openssl
+RUN apk add --no-cache git gcc musl-dev
 
-RUN wget -q -O /tmp/mtg.tar.gz \
-    https://github.com/9seconds/mtg/releases/download/v2.1.7/mtg-2.1.7-linux-amd64.tar.gz && \
-    tar -xzf /tmp/mtg.tar.gz -C /tmp/ && \
-    mv /tmp/mtg-*/mtg /usr/local/bin/mtg && \
-    chmod +x /usr/local/bin/mtg && \
-    rm -rf /tmp/*
+# نصب MTProto Proxy اصلی
+RUN git clone https://github.com/TelegramMessenger/MTProxy.git /mtproxy && \
+    cd /mtproxy && \
+    make && \
+    mv /mtproxy/objs/bin/mtproto-proxy /usr/local/bin/
+
+ENV PORT=8080
+ENV SECRET=""
+ENV TAG=""
+
+WORKDIR /mtproxy
 
 RUN cat > /start.sh << 'EOF'
 #!/bin/sh
-set -e
-
-PORT=${PORT:-8080}
-
-# سکرت ساده بدون prefix (فقط 32 کاراکتر hex)
 if [ -z "$SECRET" ]; then
-    SECRET=$(openssl rand -hex 16)
-    echo "✅ سکرت ساده تولید شد: $SECRET"
-else
-    echo "🔑 استفاده از سکرت: $SECRET"
-fi
-
-if [ -n "$RAILWAY_TCP_PROXY_DOMAIN" ]; then
-    SERVER="$RAILWAY_TCP_PROXY_DOMAIN"
-elif [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
-    SERVER="$RAILWAY_PUBLIC_DOMAIN"
-else
-    SERVER="localhost"
+    SECRET=$(head -c 16 /dev/urandom | xxd -ps)
+    echo "🆕 Secret: $SECRET"
 fi
 
 echo "=========================================="
-echo "🌐 Server: $SERVER"
+echo "🌐 Server: ${RAILWAY_TCP_PROXY_DOMAIN:-localhost}"
 echo "🔌 Port: 17782"
 echo "🔑 Secret: $SECRET"
-echo ""
-echo "📱 https://t.me/proxy?server=${SERVER}&port=17782&secret=${SECRET}"
+echo "=========================================="
+echo "📱 https://t.me/proxy?server=${RAILWAY_TCP_PROXY_DOMAIN:-localhost}&port=17782&secret=${SECRET}"
 echo "=========================================="
 
-exec /usr/local/bin/mtg simple-run "0.0.0.0:${PORT}" "${SECRET}"
+exec /usr/local/bin/mtproto-proxy \
+    -u nobody \
+    -p 8888 \
+    -H $PORT \
+    -S $SECRET \
+    --allow-skip-dh \
+    --bind-to 0.0.0.0 \
+    --aes-pwd /etc/passwd \
+    --proxy-tag ${TAG:-00000000000000000000000000000000}
 EOF
 
 RUN chmod +x /start.sh
 
-EXPOSE ${PORT}
 CMD ["/start.sh"]
