@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add --no-cache wget tar openssl xxd
+RUN apk add --no-cache wget tar openssl
 
 # دانلود mtg
 RUN wget -q -O /tmp/mtg.tar.gz \
@@ -14,36 +14,37 @@ RUN cat > /start.sh << 'EOF'
 #!/bin/sh
 set -e
 
-# تنظیم DNS در runtime (نه build)
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
-echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-
 PORT=${PORT:-8080}
 
-# تولید سکرت با cloudflare.com
+# تولید سکرت ساده (32 کاراکتر hex - بدون ee و بدون دامنه)
 if [ -z "$SECRET" ]; then
-    RANDOM_HEX=$(openssl rand -hex 16)
-    DOMAIN_HEX=$(printf 'cloudflare.com' | xxd -p | tr -d '\n')
-    SECRET="ee${RANDOM_HEX}${DOMAIN_HEX}"
+    SECRET=$(openssl rand -hex 16)
+    echo "🆕 سکرت ساده تولید شد: $SECRET"
+else
+    echo "🔑 استفاده از سکرت موجود: $SECRET"
 fi
 
+# دامنه Railway TCP
 if [ -n "$RAILWAY_TCP_PROXY_DOMAIN" ]; then
     SERVER="$RAILWAY_TCP_PROXY_DOMAIN"
 elif [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
     SERVER="$RAILWAY_PUBLIC_DOMAIN"
 else
-    SERVER="0.0.0.0"
+    SERVER="localhost"
 fi
 
 echo "=========================================="
-echo "   MTProto Proxy - Railway"
+echo "   MTProto Proxy - Railway TCP"
 echo "=========================================="
-echo "🌐 Server: ${SERVER}"
-echo "🔌 Port: 8080 (internal) -> 17782 (external)"
-echo "🔑 Secret: ${SECRET:0:20}..."
+echo "🌐 Server: $SERVER"
+echo "🔌 Internal Port: $PORT"
+echo "🔌 External Port: 17782"
+echo "🔑 Secret: $SECRET"
 echo ""
-echo "📱 لینک تلگرام (با پورت خارجی 17782):"
+echo "📱 لینک تلگرام:"
 echo "https://t.me/proxy?server=${SERVER}&port=17782&secret=${SECRET}"
+echo ""
+echo "⚠️  توجه: این پروکسی بدون FakeTLS است و ممکن است سریعتر فیلتر شود."
 echo "=========================================="
 
 exec /usr/local/bin/mtg simple-run "0.0.0.0:${PORT}" "${SECRET}"
