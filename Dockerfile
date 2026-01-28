@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # نصب ابزارهای لازم
-RUN apk add --no-cache wget tar openssl xxd
+RUN apk add --no-cache wget tar openssl xxd curl
 
 # دانلود mtg نسخه 2.1.7
 RUN wget -q -O /tmp/mtg.tar.gz \
@@ -11,7 +11,7 @@ RUN wget -q -O /tmp/mtg.tar.gz \
     && chmod +x /usr/local/bin/mtg \
     && rm -rf /tmp/*
 
-# اسکریپت راه‌اندازی
+# اسکریپت راه‌اندازی و Health Check
 RUN cat > /start.sh << 'EOF'
 #!/bin/sh
 set -e
@@ -64,11 +64,18 @@ echo ""
 
 # نمایش لینک اتصال
 echo "📱 لینک تلگرام:"
-echo "https://t.me/proxy?server=${SERVER}&port=${PORT}&secret=${SECRET}"
-echo ""
+echo "https://t.me/proxy?server=${SERVER}&port=443&secret=${SECRET}"
 echo "=========================================="
 
-# اجرای پروکسی (مهم: exec برای جلویری از exit)
+# راه‌اندازی Health Check ساده روی پورت 8080
+(
+    # اجرای سرور سلامت در پس‌زمینه
+    while true; do
+        echo "HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\nMTProto Proxy OK" | nc -l -p 8080 -q 1
+    done
+) &
+
+# اجرای پروکسی اصلی
 exec /usr/local/bin/mtg simple-run "0.0.0.0:${PORT}" "${SECRET}"
 EOF
 
@@ -76,5 +83,6 @@ RUN chmod +x /start.sh
 
 # Railway پورت رو خودش مدیریت می‌کنه
 EXPOSE ${PORT}
+EXPOSE 8080
 
 CMD ["/start.sh"]
